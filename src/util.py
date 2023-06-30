@@ -63,6 +63,24 @@ def generate_sql_statement(handle):
     return key_str
 
 
+def generate_repr_statement(handle):
+    """
+        生成数据库替换语句
+        :param handle: 根据配置文件生成的列表
+        :return: 返回数据库需要的语句
+    """
+    key_str = ''
+    for index in range(len(handle)):
+        if handle[index] == 'type':
+            continue
+        elif index == len(handle) - 1:
+            key_str += handle[index] + ' = %s'
+            continue
+        key_str += handle[index] + ' = %s,'
+
+    return key_str
+
+
 def find_config():
     """查找配置文件
     :return: 配置文件类容，配置文件路径

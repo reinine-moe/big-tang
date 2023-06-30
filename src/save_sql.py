@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import pymysql
-from src.util import find_config, generate_sql_statement
+from src.util import find_config, generate_sql_statement, generate_repr_statement
 
 """全局变量"""
 cf, config = find_config()
@@ -9,16 +9,16 @@ cf.read(config, encoding='utf-8')
 
 
 class Mysql:
-    db_name       = 'vehicleDB'
+    db_name = 'vehicleDB'
     vehicle_table = 'vehicle_table'
     account_table = 'account_table'
 
     def __init__(self):
 
-        self.host     = cf.get('sql setting', 'host')
-        self.user     = cf.get('sql setting', 'user')
+        self.host = cf.get('sql setting', 'host')
+        self.user = cf.get('sql setting', 'user')
         self.password = cf.get('sql setting', 'passwd')
-        self.port     = int(cf.get('sql setting', 'port'))
+        self.port = int(cf.get('sql setting', 'port'))
 
         create_db = f"CREATE DATABASE IF NOT EXISTS {self.db_name} character set utf8;"
 
@@ -53,12 +53,12 @@ class Mysql:
             # 生成语句
             for index in range(len(vehicle_keys)):
                 if index == 0:
-                    key_str += f'\n{" "*16}{vehicle_keys[index]} CHAR(10),\n'
+                    key_str += f'\n{" " * 16}{vehicle_keys[index]} CHAR(10),\n'
                     continue
                 elif index == len(vehicle_keys) - 1:
-                    key_str += f'{" "*16}{vehicle_keys[index]} VARCHAR(20)\n'
+                    key_str += f'{" " * 16}{vehicle_keys[index]} VARCHAR(20)\n'
                     break
-                key_str += f'{" "*16}{vehicle_keys[index]} VARCHAR(20),\n'
+                key_str += f'{" " * 16}{vehicle_keys[index]} VARCHAR(20),\n'
 
             create_table = f'''
             CREATE TABLE IF NOT EXISTS {self.vehicle_table}
@@ -88,23 +88,39 @@ class Mysql:
 
     def save_data(self, dataset: tuple or list, is_vehicle=True):
 
-        assert isinstance(dataset, tuple or list)\
-            and len(cf.get('general setting', 'vehicle_key' if is_vehicle else 'account_key')), '不符合长度或类型要求'
+        assert isinstance(dataset, tuple or list) \
+               and len(cf.get('general setting', 'vehicle_key' if is_vehicle else 'account_key')), '不符合长度或类型要求'
 
-        con       = self.connect()
+        con = self.connect()
         table_cur = con.cursor()
 
         # 判断数据属于哪个表
         if is_vehicle:
             keys = cf.get('general setting', 'vehicle_key').split(',')
-            symbol_str   = '%s,' * len(keys)                                # 根据配置文件生成与之对应值的语句
-            key_str      = generate_sql_statement(keys)                     # 根据配置文件生成语句
+            dbResult = self.fetch_data()
+            vehicle_type = dbResult[-1][1]
+            vehicle_id = dbResult[-1][3]
 
+            # 如果数据库中车辆的类型为normal且vid与之前插入的相同则删掉上条数据
             remove = f"DELETE FROM {self.vehicle_table} WHERE type = 'normal' AND vid = {dataset[2]}"
             table_cur.execute(remove)
 
-            handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
-            table_cur.execute(handle, tuple(i for i in dataset))
+            # 如果数据库中车辆的类型为accident且vid与之前插入的相同则替换上条数据除类型外的所有数值
+            if vehicle_type == 'accident' and vehicle_id == dataset[2]:
+                repr_str = generate_repr_statement(keys)  # 根据配置文件生成替换语句
+
+                replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'accident' AND vid = {dataset[2]}"
+
+                table_cur.execute(replace,
+                                  tuple(i for i in dataset if i not in ('normal', 'accident'))
+                                  )  # 不管当前传入的数据是正常车还是事故车，只要之前存入数据库中的vid被判定为事故车的话，
+                                     # 就不会再改变此vid的类型，只更新其他参数
+            else:
+                symbol_str = '%s,' * len(keys)  # 根据配置文件生成与之对应值的插入语句
+                key_str = generate_sql_statement(keys)  # 根据配置文件生成插入语句
+
+                handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
+                table_cur.execute(handle, tuple(i for i in dataset))
 
         else:
             account_keys = cf.get('general setting', 'account_key').split(',')
@@ -149,6 +165,7 @@ class Mysql:
         con.close()
 
         return result[1]
+
 
 if __name__ == '__main__':
     sql = Mysql()

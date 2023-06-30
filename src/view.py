@@ -50,14 +50,14 @@ def response(type):
         result      = sql.fetch_data()
         json_result = generate_sql_json(result)
 
-        json_result.update({'.info': {'recent upload': sql.fetch_latest_time(), 'sum': len(result)}})
+        json_result.update({'info': {'recent upload': sql.fetch_latest_time(), 'sum': len(result)}})
         return json_result
 
     elif type == 'account':
         result      = sql.fetch_data(False)
         json_result = generate_sql_json(result, False)
 
-        json_result.update({'.info': {'recent upload': sql.fetch_latest_time(False), 'sum': len(result)}})
+        json_result.update({'info': {'recent upload': sql.fetch_latest_time(False), 'sum': len(result)}})
         return json_result
     else:
         return {'msg': 'bad request'}
@@ -72,7 +72,7 @@ def runserver():
     signal.signal(signal.SIGTERM, signal.SIG_DFL)        # SIGTERM信号是由操作系统发送给进程，用于请求进程终止。
 
     #  创建线程
-    main_thr        = threading.Thread(target=app.run, args=['0.0.0.0'])  # '192.168.233.90' '0.0.0.0'
+    main_thr        = threading.Thread(target=app.run, args=['192.168.0.100'])  # '192.168.233.90' '0.0.0.0'
     main_thr.daemon = True
     main_thr.start()
     time.sleep(0.5)
