@@ -15,7 +15,6 @@ app = Flask(__name__)
 CORS(app, resources=r'/*')  # 设置跨域
 
 sql = Mysql()
-sql.init_table()
 
 
 @app.route('/')
@@ -25,6 +24,7 @@ def index():
 
 @app.route('/send', methods=['GET', 'POST'])
 def receive_data():
+    sql.init_table()
     keys   = cf.get('general setting', 'vehicle_key').split(',')
     result = []
 
@@ -72,7 +72,7 @@ def runserver():
     signal.signal(signal.SIGTERM, signal.SIG_DFL)        # SIGTERM信号是由操作系统发送给进程，用于请求进程终止。
 
     #  创建线程
-    main_thr        = threading.Thread(target=app.run, args=['192.168.233.90'])  # '192.168.233.90' '0.0.0.0'
+    main_thr        = threading.Thread(target=app.run, args=['0.0.0.0'])  # '192.168.233.90' '0.0.0.0'
     main_thr.daemon = True
     main_thr.start()
     time.sleep(0.5)

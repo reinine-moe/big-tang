@@ -47,7 +47,7 @@ def socket_server():
     # 建立TCP嵌套字
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = socket.gethostbyname(socket.gethostname())
-    port = 5002
+    port = 5001
 
     sock.bind((host, port))
     print(f'\n * Socket server start... {(socket.gethostbyname(socket.gethostname()), port)}\n')

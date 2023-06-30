@@ -100,8 +100,10 @@ class Mysql:
             symbol_str   = '%s,' * len(keys)                                # 根据配置文件生成与之对应值的语句
             key_str      = generate_sql_statement(keys)                     # 根据配置文件生成语句
 
-            handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
+            remove = f"DELETE FROM {self.vehicle_table} WHERE type = 'normal' AND vid = {dataset[2]}"
+            table_cur.execute(remove)
 
+            handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
             table_cur.execute(handle, tuple(i for i in dataset))
 
         else:

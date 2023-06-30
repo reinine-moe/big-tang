@@ -102,7 +102,7 @@ def analysis_data(datas):
         if datas[1] != 'no problem':
             datas[1] += '侧翻'
         datas[1] = '侧翻'
-    if 0 < float(datas[-1]) < 1.0:                           # GForce
+    if 0 < float(datas[-1]) < 0.85:                          # GForce
         datas[0] = 'accident'
         if datas[1] != 'no problem':
             datas[1] += '碰撞'
