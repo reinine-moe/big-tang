@@ -149,3 +149,9 @@ class Mysql:
         con.close()
 
         return result[1]
+
+if __name__ == '__main__':
+    sql = Mysql()
+    result = sql.fetch_data()
+    vehicle_tyoe = result[-2][1]
+    print(vehicle_tyoe)

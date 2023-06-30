@@ -54,6 +54,13 @@ def socket_server():
     sock.listen(5)
     while True:
         conn, addr = sock.accept()
+
+        # 如果收到了事故消息则发送给正常车
+        accident_msg = sql.fetch_data()
+        vehicle_type = accident_msg[-1][1]                  # type
+        if accident_msg != [] and vehicle_type == 'accident':
+            conn.send(f"1".encode('utf-8'))
+
         try:
             thread = SocketConnect(conn, addr)
             thread.start()
@@ -102,6 +109,6 @@ def socket_server():
 
                 sql.save_data(tuple(result))             # 保存数据到数据库
                 continue
-        except threading.ThreadError:
+        except threading.ThreadError or ConnectionResetError or ConnectionAbortedError:
             print(' * Reconnection...')
             continue

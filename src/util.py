@@ -42,7 +42,7 @@ def generate_sql_json(dataset: tuple, is_vehicle=True):
         dataset_index += 1
 
     result = {}
-    result.update({'data_set': total_json})
+    result.update({'data': total_json})
 
     return result
 
