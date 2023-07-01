@@ -63,7 +63,7 @@ def generate_sql_statement(handle):
     return key_str
 
 
-def generate_repr_statement(handle):
+def generate_repr_statement(handle, not_normal=True):
     """
         生成数据库替换语句
         :param handle: 根据配置文件生成的列表
@@ -71,7 +71,7 @@ def generate_repr_statement(handle):
     """
     key_str = ''
     for index in range(len(handle)):
-        if handle[index] == 'type':
+        if not_normal and handle[index] == 'type':
             continue
         elif index == len(handle) - 1:
             key_str += handle[index] + ' = %s'

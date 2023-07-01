@@ -127,10 +127,10 @@ class Mysql:
                     print('\nrecord inserted\n')
                     return
                 elif data[1] == 'normal' and data[3] == dataset[2]:
-                    repr_str = generate_repr_statement(keys)
+                    repr_str = generate_repr_statement(keys, not_normal=False)
                     replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'normal' AND vid = {dataset[2]}"
                     table_cur.execute(
-                        replace,tuple(i for i in dataset if i not in ('normal', 'accident'))
+                        replace,tuple(i for i in dataset)
                     )
                     con.commit()
                     table_cur.close()
