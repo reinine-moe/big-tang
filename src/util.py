@@ -27,8 +27,8 @@ def generate_sql_json(dataset: tuple, is_vehicle=True):
     data_json = {}
     for key in keys:
         data_json.update({key: ''})
-    for index in range(len(dataset)):
-        total_json.update({f'{index+1}': data_json.copy()})
+    for data in dataset:
+        total_json.update({f'{data[3]}': data_json.copy()})
 
     # 导入数据
     dataset_index = 0                              # 嵌套元组下标

@@ -98,37 +98,50 @@ class Mysql:
         if is_vehicle:
             keys = cf.get('general setting', 'vehicle_key').split(',')
             dbResult = self.fetch_data()
-            vehicle_type = dbResult[-1][1]
-            vehicle_id = dbResult[-1][3]
 
-            # 如果数据库中车辆的类型为normal且vid与之前插入的相同则删掉上条数据
-            remove = f"DELETE FROM {self.vehicle_table} WHERE type = 'normal' AND vid = {dataset[2]}"
-            table_cur.execute(remove)
-
-            # 如果数据库中车辆的类型为accident且vid与之前插入的相同则替换上条数据除类型外的所有数值
-            if vehicle_type == 'accident' and vehicle_id == dataset[2]:
-                repr_str = generate_repr_statement(keys)  # 根据配置文件生成替换语句
-
-                replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'accident' AND vid = {dataset[2]}"
-
-                table_cur.execute(replace,
-                                  tuple(i for i in dataset if i not in ('normal', 'accident'))
-                                  )  # 不管当前传入的数据是正常车还是事故车，只要之前存入数据库中的vid被判定为事故车的话，
-                                     # 就不会再改变此vid的类型，只更新其他参数
-            else:
+            # 若数据库里没有数据则直接添加一条新数据
+            if len(dbResult) == 0:
                 symbol_str = '%s,' * len(keys)  # 根据配置文件生成与之对应值的插入语句
                 key_str = generate_sql_statement(keys)  # 根据配置文件生成插入语句
 
                 handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
                 table_cur.execute(handle, tuple(i for i in dataset))
+                con.commit()
+                table_cur.close()
+                con.close()
+                print('\nrecord inserted\n')
+                return
 
-        else:
-            account_keys = cf.get('general setting', 'account_key').split(',')
-            symbol_str = '%s,' * len(account_keys)
-            key_str = generate_sql_statement(account_keys)
 
-            handle = f"INSERT INTO {self.account_table}({key_str}) VALUES({symbol_str[:-1]});"
-            table_cur.execute(handle, tuple(i for i in dataset))
+            for data in dbResult:
+                if data[1] == 'accident' and data[3] == dataset[2]:
+                    repr_str = generate_repr_statement(keys)  # 根据配置文件生成替换语句
+                    replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'accident' AND vid = {dataset[2]}"
+                    table_cur.execute(
+                        replace, tuple(i for i in dataset if i not in ('normal', 'accident'))
+                    )                                           # 不管当前传入的数据是正常车还是事故车，只要之前存入数据库中的vid被判定为事故车的话，
+                                                                # 就不会再改变此vid的类型，只更新其他参数
+                    con.commit()
+                    table_cur.close()
+                    con.close()
+                    print('\nrecord inserted\n')
+                    return
+                elif data[1] == 'normal' and data[3] == dataset[2]:
+                    repr_str = generate_repr_statement(keys)
+                    replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'normal' AND vid = {dataset[2]}"
+                    table_cur.execute(
+                        replace,tuple(i for i in dataset if i not in ('normal', 'accident'))
+                    )
+                    con.commit()
+                    table_cur.close()
+                    con.close()
+                    print('\nrecord inserted\n')
+                    return
+        symbol_str = '%s,' * len(keys)  # 根据配置文件生成与之对应值的插入语句
+        key_str = generate_sql_statement(keys)  # 根据配置文件生成插入语句
+
+        handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
+        table_cur.execute(handle, tuple(i for i in dataset))
 
         con.commit()
         table_cur.close()
