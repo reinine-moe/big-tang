@@ -41,6 +41,18 @@ def generate_sql_json(dataset: tuple, is_vehicle=True):
         # 归零操作，并转到下一组数据
         dataset_index += 1
 
+    # 根据车辆情况添加基站信息
+    info = {'type': '基站', 'conditions': '无事故', 'vid': None, 'time': None, 'longitude': None, 'latitude': None}
+    for condition in dataset:
+        if condition[1] == 'accident':
+            info['conditions'] = '事故发生'
+            info['vid']        = condition[3]
+            info['time']       = condition[4]
+            info['longitude']  = condition[5]
+            info['latitude']   = condition[6]
+            break
+    total_json.update({'基站': info})
+
     result = {}
     result.update({'data': total_json})
 

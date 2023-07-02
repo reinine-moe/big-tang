@@ -23,7 +23,13 @@ class SocketConnect(threading.Thread):
         print('\n * access successfully! ', self.addr)
         received = False
         while True:
-            msg = self.conn.recv(1024).decode('utf-8')
+
+            try:
+                msg = self.conn.recv(1024).decode('utf-8')
+            except ConnectionResetError or ConnectionAbortedError:
+                print(' * Reconnection...')
+                self.conn.close()
+
             now = datetime.now()
             if len(msg) == 0:
                 print(f'{self.addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] "disconnected"\n')
@@ -48,6 +54,7 @@ def socket_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = socket.gethostbyname(socket.gethostname())
     port = 5001
+    record_id = ''
 
     sock.bind((host, port))
     print(f'\n * Socket server start... {(socket.gethostbyname(socket.gethostname()), port)}\n')
@@ -55,11 +62,13 @@ def socket_server():
     while True:
         conn, addr = sock.accept()
 
-        # 如果收到了事故消息则发送给正常车
-        accident_msg = sql.fetch_data()
-        vehicle_type = accident_msg[-1][1]                  # type
-        if accident_msg != [] and vehicle_type == 'accident':
-            conn.send(f"1".encode('utf-8'))
+        dataset = sql.fetch_data()
+        for data in dataset:
+            #如果数据库不为空，并且数据库中有报警信息，且这个报警信息没有被记录，则发送信息给正常车
+            if dataset != [] and data[1] == 'accident' and data[3] not in record_id:
+                record_id += data[3] + ','
+                conn.send(f"1".encode('utf-8'))
+                break
 
         try:
             thread = SocketConnect(conn, addr)
@@ -109,6 +118,6 @@ def socket_server():
 
                 sql.save_data(tuple(result))             # 保存数据到数据库
                 continue
-        except threading.ThreadError or ConnectionResetError or ConnectionAbortedError:
+        except threading.ThreadError:
             print(' * Reconnection...')
             continue

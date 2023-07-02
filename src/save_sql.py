@@ -9,7 +9,7 @@ cf.read(config, encoding='utf-8')
 
 
 class Mysql:
-    db_name = 'vehicleDB'
+    db_name = 'vehicledb'
     vehicle_table = 'vehicle_table'
     account_table = 'account_table'
 
@@ -91,6 +91,12 @@ class Mysql:
         assert isinstance(dataset, tuple or list) \
                and len(cf.get('general setting', 'vehicle_key' if is_vehicle else 'account_key')), '不符合长度或类型要求'
 
+        def commit():
+            con.commit()
+            table_cur.close()
+            con.close()
+            print('\nrecord inserted\n')
+
         con = self.connect()
         table_cur = con.cursor()
 
@@ -101,52 +107,41 @@ class Mysql:
 
             # 若数据库里没有数据则直接添加一条新数据
             if len(dbResult) == 0:
-                symbol_str = '%s,' * len(keys)  # 根据配置文件生成与之对应值的插入语句
-                key_str = generate_sql_statement(keys)  # 根据配置文件生成插入语句
+                symbol_str = '%s,' * len(keys)                   # 根据配置文件生成与之对应值的插入语句
+                key_str = generate_sql_statement(keys)           # 根据配置文件生成插入语句
 
                 handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
                 table_cur.execute(handle, tuple(i for i in dataset))
-                con.commit()
-                table_cur.close()
-                con.close()
-                print('\nrecord inserted\n')
+                commit()
                 return
-
 
             for data in dbResult:
                 if data[1] == 'accident' and data[3] == dataset[2]:
-                    repr_str = generate_repr_statement(keys)  # 根据配置文件生成替换语句
+                    repr_str = generate_repr_statement(keys)     # 根据配置文件生成替换语句
                     replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'accident' AND vid = {dataset[2]}"
                     table_cur.execute(
                         replace, tuple(i for i in dataset if i not in ('normal', 'accident'))
-                    )                                           # 不管当前传入的数据是正常车还是事故车，只要之前存入数据库中的vid被判定为事故车的话，
-                                                                # 就不会再改变此vid的类型，只更新其他参数
-                    con.commit()
-                    table_cur.close()
-                    con.close()
-                    print('\nrecord inserted\n')
+                    )                                            # 不管当前传入的数据是正常车还是事故车，只要之前存入数据库中的vid被判定为事故车的话，
+                                                                 # 就不会再改变此vid的类型，只更新其他参数
+                    commit()
                     return
+
                 elif data[1] == 'normal' and data[3] == dataset[2]:
                     repr_str = generate_repr_statement(keys, not_normal=False)
                     replace = f"UPDATE {self.vehicle_table} SET {repr_str} WHERE type = 'normal' AND vid = {dataset[2]}"
                     table_cur.execute(
                         replace,tuple(i for i in dataset)
                     )
-                    con.commit()
-                    table_cur.close()
-                    con.close()
-                    print('\nrecord inserted\n')
+                    commit()
                     return
-        symbol_str = '%s,' * len(keys)  # 根据配置文件生成与之对应值的插入语句
-        key_str = generate_sql_statement(keys)  # 根据配置文件生成插入语句
+
+        symbol_str = '%s,' * len(keys)                          # 根据配置文件生成与之对应值的插入语句
+        key_str = generate_sql_statement(keys)                  # 根据配置文件生成插入语句
 
         handle = f"INSERT INTO {self.vehicle_table}({key_str}) VALUES({symbol_str[:-1]});"
         table_cur.execute(handle, tuple(i for i in dataset))
 
-        con.commit()
-        table_cur.close()
-        con.close()
-        print('\nrecord inserted\n')
+        commit()
 
     def fetch_data(self, is_vehicle=True):
         con = self.connect()
@@ -168,7 +163,7 @@ class Mysql:
 
         table = 'vehicle_table' if is_vehicle else 'account_table'
         fetch_time = "SELECT `TABLE_NAME`, `UPDATE_TIME` FROM `information_schema`.`TABLES` " \
-                     "WHERE `information_schema`.`TABLES`.`TABLE_SCHEMA` = 'vehicledb' " \
+                     f"WHERE `information_schema`.`TABLES`.`TABLE_SCHEMA` = '{self.db_name}' " \
                      f"AND`information_schema`.`TABLES`.`TABLE_NAME` = '{table}';"
 
         cursor.execute(fetch_time)
