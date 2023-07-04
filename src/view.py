@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request
 from flask_cors import CORS
+from flask_compress import Compress
 from src.socket_connect import *
 from src.util import find_config, generate_sql_json, analysis_data
 import time
@@ -12,7 +13,9 @@ cf, config = find_config()
 cf.read(config, encoding='utf-8')
 
 app = Flask(__name__)
+app.config['COMPRESS_REGISTER'] = False
 CORS(app, resources=r'/*')  # 设置跨域
+compress = Compress(app)    # 压缩数据包
 
 sql = Mysql()
 sql.init_table()
@@ -24,24 +27,24 @@ def index():
 
 
 @app.route('/send', methods=['GET', 'POST'])
+@compress.compressed()
 def receive_data():
-    sql.init_table()
+    #start = time.time()
+    #sql.init_table()
     keys   = cf.get('general setting', 'vehicle_key').split(',')
-    result = []
 
     # 循环遍历配置文件中的值，并接收以此为参数的返回值，将其存进result列表中
-    for i in keys:
-        value = request.args.get(i)
-        result.append(value)
+    result = [request.args.get(i) for i in keys]
 
     sql.save_data(tuple(analysis_data(result)))
-
+    
     key_result = {}
     counter = 0
     while counter < len(keys):
         key_result.update({f'{keys[counter]}': f'{result[counter]}'})
         counter += 1
 
+    #print('time:',time.time()-start)
     return key_result
 
 

@@ -111,30 +111,8 @@ def analysis_data(datas):
     :return: 分析好的数据
     """
 
-    # type, conditions, vid, time, longitude, latitude, AcX, AcY, AcZ, Gyx, Gyy, Gyz, temp, GForce
-    datas[0] = 'normal'
-    datas[1] = 'no problem'
     if datas[3] is None:                                    # time
         now = datetime.now()
         datas[3] = now.strftime("%d/%m/%Y %H:%M:%S")
 
-    if datas[6] == '0' or datas[7] == '0' or datas[8] == '0' or datas[2] == '0':
-        datas[0] = 'normal'
-        datas[1] = '分析数据丢失'
-    if float(datas[6]) > 30:                                # AcX
-        datas[0] = 'normal'
-        datas[1] = '急停'
-    if 70 < float(datas[-2]):                               # temp
-        datas[0] = 'normal'
-        datas[1] = '温度过热'
-    if -30 > float(datas[7]) or float(datas[7]) > 30:       # AcY
-        datas[0] = 'accident'
-        if datas[1] != 'no problem':
-            datas[1] += '侧翻'
-        datas[1] = '侧翻'
-    if 0 < float(datas[-1]) < 0.85:                          # GForce
-        datas[0] = 'accident'
-        if datas[1] != 'no problem':
-            datas[1] += '碰撞'
-        datas[1] = '碰撞'
     return datas
