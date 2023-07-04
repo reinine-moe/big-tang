@@ -7,6 +7,7 @@ from src.socket_connect import *
 from src.util import find_config, generate_sql_json, analysis_data
 import time
 import signal
+import threading
 
 """全局变量"""
 cf, config = find_config()
@@ -51,14 +52,14 @@ def receive_data():
 @app.route('/<type>/api')
 def response(type):
     if type == 'vehicle':
-        result      = sql.fetch_data()
+        result = sql.fetch_data()
         json_result = generate_sql_json(result)
 
         json_result.update({'info': {'recent upload': sql.fetch_latest_time(), 'sum': len(result)}})
         return json_result
 
     elif type == 'account':
-        result      = sql.fetch_data(False)
+        result = sql.fetch_data(False)
         json_result = generate_sql_json(result, False)
 
         json_result.update({'info': {'recent upload': sql.fetch_latest_time(False), 'sum': len(result)}})
@@ -74,14 +75,16 @@ def runserver():
                                                          # 用于请求程序终止。
 
     signal.signal(signal.SIGTERM, signal.SIG_DFL)        # SIGTERM信号是由操作系统发送给进程，用于请求进程终止。
+    socket_server = ServerProcess('0.0.0.0', 5001, 2)
+
 
     #  创建线程
-    main_thr        = threading.Thread(target=app.run, args=['0.0.0.0'])  # '192.168.0.100' '0.0.0.0'
+    main_thr = threading.Thread(target=app.run, args=['0.0.0.0'])  # '192.168.0.100' '0.0.0.0'
     main_thr.daemon = True
     main_thr.start()
     time.sleep(0.5)
 
-    comm_thr        = threading.Thread(target=socket_server)
+    comm_thr = threading.Thread(target=socket_server.server_start)
     comm_thr.daemon = True
     comm_thr.start()
 
