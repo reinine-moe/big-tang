@@ -84,7 +84,7 @@ def runserver():
     main_thr.start()
     time.sleep(0.5)
 
-    comm_thr = threading.Thread(target=socket_server.server_start)
+    comm_thr = threading.Thread(target=server_start)
     comm_thr.daemon = True
     comm_thr.start()
 

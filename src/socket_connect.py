@@ -1,5 +1,5 @@
 import socket
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 from datetime import datetime
 from src.save_sql import Mysql
 from src.util import find_config
@@ -13,52 +13,52 @@ cf.read(config, encoding='utf-8')
 
 
 class ServerProcess:
-    record_id = ''
-
     def __init__(self, ipaddr, port, num):
         self.ipaddr = ipaddr
         self.port = port
         self.num = num
 
-    def handle_data(self, datas, client):
-        dataset = sql.fetch_data()
+    @staticmethod
+    def handle_recv(datas, client, record_id):
+        """
+        处理接收到的数据
+        :param datas: 接收到的数据
+        :param client: 请求的套接字类
+        :param record_id: 数据互通的共享列表，用于记录事故车辆id
+        """
+        # 提取关键值
+        datas = datas.split(',')
+        datas = [i.split(':')[-1] for i in datas]
 
-        if datas and type(datas) is str:
-            # 提取关键值
-            datas = datas.split(',')
-            datas = [i.split(':')[-1] for i in datas]
+        # 如果数据为正常车并且事故车有被记录
+        if 'normal' in datas and record_id:
+            client.send(f"{record_id.pop()}".encode('utf-8'))
 
-            if 'normal' in datas:
-                for value in dataset:
-                    # 如果数据库不为空，并且数据库中有报警信息，且这个报警信息没有被记录，则发送信息给正常车
-                    if dataset != [] and value[1] == 'accident' and value[3] not in self.record_id:
-                        self.record_id += value[3] + ','
-                        client.send(f"1".encode('utf-8'))
-                        print('send message!')
-                        break
+        # 如果数据为事故车并且当前数据没有被记录
+        elif 'accident' in datas and datas[2] not in record_id:
+            record_id.append(datas[2])  # data[2] = vid
 
-            # type, conditions, vid, time, longitude, latitude
-            result = []
-            data_index = 0
-            keys = cf.get('general setting', 'vehicle_key').split(',')
-            for index in range(len(keys)):
-                if index == 3:  # time
-                    now = datetime.now()
-                    result.append(now.strftime("%d/%m/%Y %H:%M:%S"))
-                    continue
-                result.append(datas[data_index])
-                data_index += 1
+        # type, conditions, vid, time, longitude, latitude
+        result = []
+        data_index = 0
+        keys = cf.get('general setting', 'vehicle_key').split(',')
+        for index in range(len(keys)):
+            if index == 3:  # time
+                now = datetime.now()
+                result.append(now.strftime("%d/%m/%Y %H:%M:%S"))
+                continue
+            result.append(datas[data_index])
+            data_index += 1
 
-            sql.save_data(tuple(result))  # 保存数据到数据库
+        sql.save_data(tuple(result))  # 保存数据到数据库
 
-    # 服务端的数据接收，在调用时使用多进程
-    def server_link(self, conn, addr):
+    def server_link(self, conn, addr, record_id):
+        """服务端的数据接收，在调用时使用多进程"""
         while True:
             received = False
-
             try:
                 msg = conn.recv(1024).decode('utf-8')
-            except ConnectionResetError or ConnectionAbortedError:
+            except ConnectionResetError or ConnectionAbortedError or UnicodeDecodeError:
                 print(' * Reconnection...')
                 break
 
@@ -66,7 +66,7 @@ class ServerProcess:
             if len(msg) == 0:
                 print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] "disconnected"\n')
                 break
-            elif ',' in msg:
+            elif ',' in msg and type(msg) is str:
                 print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] data correct msg: '
                       f'"{msg}"\n')
                 received = True
@@ -75,11 +75,12 @@ class ServerProcess:
                       f'"{msg}"')
 
             if received:
-                self.handle_data(msg, conn)
+                self.handle_recv(msg, conn, record_id)
         conn.close()
 
-    # 服务端的启动程序
-    def server_start(self):
+
+    def run(self, record_id):
+        """服务端的启动程序"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # 操作系统会在服务器socket被关闭或服务器进程终止后马上释放该服务器的端口
 
@@ -90,10 +91,21 @@ class ServerProcess:
             conn, addr = sock.accept()
             print('\n * access successfully! ', addr)
             # 启动多进程实现多连接
-            p = Process(target=self.server_link, args=(conn, addr))
+            p = Process(target=self.server_link, args=(conn, addr, record_id))
             p.start()
 
 
+def server_start(host='0.0.0.0', port=5001, listen=5):
+    """
+    :param host: 目标ip
+    :param port: 端口号
+    :param listen: 监听数
+    """
+    manager = Manager()
+    record_id = manager.list()  # 创建子进程之间可以进行共享的列表
+    server = ServerProcess(host, port, listen)
+    server.run(record_id)
+
+
 if __name__ == '__main__':
-    server = ServerProcess('0.0.0.0', 5001, 2)
-    server.server_start()
+    server_start()
