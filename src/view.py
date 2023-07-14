@@ -30,8 +30,6 @@ def index():
 @app.route('/send', methods=['GET', 'POST'])
 @compress.compressed()
 def receive_data():
-    #start = time.time()
-    #sql.init_table()
     keys   = cf.get('general setting', 'vehicle_key').split(',')
 
     # 循环遍历配置文件中的值，并接收以此为参数的返回值，将其存进result列表中
@@ -44,8 +42,6 @@ def receive_data():
     while counter < len(keys):
         key_result.update({f'{keys[counter]}': f'{result[counter]}'})
         counter += 1
-
-    #print('time:',time.time()-start)
     return key_result
 
 
@@ -75,14 +71,13 @@ def runserver():
                                                          # 用于请求程序终止。
 
     signal.signal(signal.SIGTERM, signal.SIG_DFL)        # SIGTERM信号是由操作系统发送给进程，用于请求进程终止。
-    socket_server = ServerProcess('0.0.0.0', 5001, 2)
 
 
     #  创建线程
     main_thr = threading.Thread(target=app.run, args=['0.0.0.0'])  # '192.168.0.100' '0.0.0.0'
     main_thr.daemon = True
     main_thr.start()
-    time.sleep(0.5)
+    time.sleep(0.2)
 
     comm_thr = threading.Thread(target=server_start)
     comm_thr.daemon = True

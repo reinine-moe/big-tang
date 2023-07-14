@@ -1,5 +1,6 @@
 import socket
-from multiprocessing import Process, Manager
+from multiprocessing import Queue
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from src.save_sql import Mysql
 from src.util import find_config
@@ -17,26 +18,36 @@ class ServerProcess:
         self.ipaddr = ipaddr
         self.port = port
         self.num = num
+        self.record_queues = {}  # 记录每个车辆套接字对应的队列
 
-    @staticmethod
-    def handle_recv(datas, client, record_id):
+    def handle_recv(self, datas, client, address, record_queue):
         """
         处理接收到的数据
         :param datas: 接收到的数据
         :param client: 请求的套接字类
-        :param record_id: 数据互通的共享列表，用于记录事故车辆id
+        :param address: 请求的地址
+        :param record_queue: 数据互通的共享列表，用于记录事故车辆id
         """
         # 提取关键值
         datas = datas.split(',')
         datas = [i.split(':')[-1] for i in datas]
+        record_list = []
+
+        # 弹出当前队列
+        while not record_queue.empty():
+            record_list.append(record_queue.get())
 
         # 如果数据为正常车并且事故车有被记录
-        if 'normal' in datas and record_id:
-            client.send(f"{record_id.pop()}".encode('utf-8'))
+        if 'normal' in datas and record_list:
+            client.send(f"{record_list.pop()}".encode('utf-8'))
 
         # 如果数据为事故车并且当前数据没有被记录
-        elif 'accident' in datas and datas[2] not in record_id:
-            record_id.append(datas[2])  # data[2] = vid
+        elif 'accident' in datas and datas[2] not in record_list:
+            # 遍历队列字典，如果当前车辆进程的套接字不等于线程池中的套接字，则把当前车辆id存入其他车辆的队列中
+            for car_queue in list(self.record_queues.items()):
+                print(address, car_queue[0])
+                if address != car_queue[0]:
+                    car_queue[1].put(datas[2])  # data[2] = vid, 将车辆id放入队列顶部
 
         # type, conditions, vid, time, longitude, latitude
         result = []
@@ -46,6 +57,11 @@ class ServerProcess:
             if index == 3:  # time
                 now = datetime.now()
                 result.append(now.strftime("%d/%m/%Y %H:%M:%S"))
+                continue
+            # 当索引大于发送数据本身则传输空值
+            if data_index >= len(datas):
+                result.append(None)
+                data_index += 1
                 continue
             result.append(datas[data_index])
             data_index += 1
@@ -75,11 +91,10 @@ class ServerProcess:
                       f'"{msg}"')
 
             if received:
-                self.handle_recv(msg, conn, record_id)
+                self.handle_recv(msg, conn, addr, record_id)
         conn.close()
 
-
-    def run(self, record_id):
+    def run(self):
         """服务端的启动程序"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # 操作系统会在服务器socket被关闭或服务器进程终止后马上释放该服务器的端口
@@ -87,12 +102,18 @@ class ServerProcess:
         sock.bind((self.ipaddr, self.port))
         sock.listen(self.num)
         print(f'\n * Socket server start... {(socket.gethostbyname(socket.gethostname()), self.port)}\n')
-        while True:
-            conn, addr = sock.accept()
-            print('\n * access successfully! ', addr)
-            # 启动多进程实现多连接
-            p = Process(target=self.server_link, args=(conn, addr, record_id))
-            p.start()
+        # 使用线程池管理多个子线程
+        with ThreadPoolExecutor(max_workers=self.num) as executor:
+
+            while True:
+                conn, addr = sock.accept()
+                print('\n * access successfully! ', addr)
+
+                if addr[0] not in self.record_queues:
+                    # 如果是新的正常车辆链接，则创建对应的队列
+                    self.record_queues[addr] = Queue()
+                # 启动子线程处理连接
+                executor.submit(self.server_link, conn, addr, self.record_queues[addr])
 
 
 def server_start(host='0.0.0.0', port=5001, listen=5):
@@ -101,10 +122,8 @@ def server_start(host='0.0.0.0', port=5001, listen=5):
     :param port: 端口号
     :param listen: 监听数
     """
-    manager = Manager()
-    record_id = manager.list()  # 创建子进程之间可以进行共享的列表
     server = ServerProcess(host, port, listen)
-    server.run(record_id)
+    server.run()
 
 
 if __name__ == '__main__':
