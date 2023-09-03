@@ -95,7 +95,7 @@ class Mysql:
             con.commit()
             table_cur.close()
             con.close()
-            print('\nrecord inserted\n')
+            print('record inserted\n')
 
         con = self.connect()
         table_cur = con.cursor()

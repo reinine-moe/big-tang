@@ -80,11 +80,19 @@ class ServerProcess:
 
             now = datetime.now()
             if len(msg) == 0:
-                print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] "disconnected"\n')
+                print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] "disconnected"')
                 break
             elif ',' in msg and type(msg) is str:
                 print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] data correct msg: '
-                      f'"{msg}"\n')
+                      f'"{msg}"')
+
+                # 检测发送的数据中是否发送了多余的重复值，没有则跳过
+                try:
+                    key             = cf.get('general setting', 'vehicle_key').split(',')[0]
+                    detect_msg_index = msg.index(key, msg.index(key) + 1)
+                    msg              = msg[:detect_msg_index]
+                except ValueError and IndexError:
+                    pass
                 received = True
             else:
                 print(f'{addr[0]} - - [{now.strftime("%d/%m/%Y %H:%M:%S")}] [socket server] data wrong msg: '
@@ -109,8 +117,8 @@ class ServerProcess:
                 conn, addr = sock.accept()
                 print('\n * access successfully! ', addr)
 
+                # 如果是新的正常车辆链接，则创建对应的队列
                 if addr[0] not in self.record_queues:
-                    # 如果是新的正常车辆链接，则创建对应的队列
                     self.record_queues[addr] = Queue()
                 # 启动子线程处理连接
                 executor.submit(self.server_link, conn, addr, self.record_queues[addr])
